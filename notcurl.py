@@ -42,8 +42,8 @@ parser = argparse.ArgumentParser(
 # subparser = parser.add_subparsers()
 
 group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("-get", help="executes a HTTP GET request and prints the response.", dest='get')
-group.add_argument("-post", help="executes a HTTP POST request and prints the response.", dest='post')
+group.add_argument("-get", action="store_true", help="executes a HTTP GET request and prints the response.", dest='get')
+group.add_argument("-post", action="store_true",help="executes a HTTP POST request and prints the response.", dest='post')
 
 # post_d = subparser.add_parser("-d", help="Associates an inline data to the body HTTP POST request.")
 # post_f = subparser.add_parser("-f",help="Associates the content of a file to the body HTTP POST request.")
@@ -56,6 +56,17 @@ parser.add_argument("-h", help="Associates headers to HTTP Request with the form
 
 parser.add_argument("-d",help="Associates an inline data to the body HTTP POST request.", metavar="inline-data")
 parser.add_argument("-f",help="Associates the content of a file to the body HTTP POST request.", metavar="file")
-# parser.add_argument("URL", help="URL for the GET|POST request")
+parser.add_argument("URL", help="URL for the GET|POST request")
 
 args = parser.parse_args()
+if args.get and (args.d or args.f):
+    parser.error("GET can't have d or f arguments")
+
+elif args.post and not (bool(args.d) != bool(args.f)):
+    parser.error("POST should only have either d or f argument")
+
+elif args.get:
+    print("execute get method")
+
+elif args.post:
+    print("execute post method")
