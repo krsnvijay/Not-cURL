@@ -30,43 +30,39 @@ response = client.recv(4096)
 # print(response.decode("utf-8"))
 
 
-# -v, -h(works with "key:value"): Optional Argument, URL(has to be split) : Positional argument 
-#get|post: group arguments, Post can either have -d,-f but not both (optional arguments). GET has nothing
+# -v, -h(works with "key:value"): Optional Argument, URL(has to be split) : Positional argument
+# get|post: group arguments, Post can either have -d,-f but not both (optional arguments). GET has nothing
 parser = argparse.ArgumentParser(
-    description="httpc is a curl-like application but supports HTTP protocol only.", 
-    formatter_class= argparse.RawDescriptionHelpFormatter,
-    usage='''\n%(prog)s command [arguments]''',
+    description="httpc is a curl-like application but supports HTTP protocol only.",
+    formatter_class=argparse.RawDescriptionHelpFormatter,
     prog="httpc",
     add_help=False,
     epilog='Use "httpc help [command]" for more information about a command.')
-# subparser = parser.add_subparsers()
 
-group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument("-get", action="store_true", help="executes a HTTP GET request and prints the response.", dest='get')
-group.add_argument("-post", action="store_true",help="executes a HTTP POST request and prints the response.", dest='post')
+parser.add_argument("-help", action='help', help='prints this screen')
+parser.add_argument("-v", "--verbosity",
+                    help="Prints the detail of the response such as protocol, status, and headers.", action="store_true")
+parser.add_argument("-h", help="Associates headers to HTTP Request with the format 'key:value'.",
+                    metavar="k:v", action='append', nargs="*")
 
-# post_d = subparser.add_parser("-d", help="Associates an inline data to the body HTTP POST request.")
-# post_f = subparser.add_parser("-f",help="Associates the content of a file to the body HTTP POST request.")
-# post_d.add_argument("-post", help="executes a HTTP POST request and prints the response.")
-# post_f.add_argument("-post", help="executes a HTTP POST request and prints the response.")
+subparser = parser.add_subparsers(help='commands')
 
-parser.add_argument("-v","--verbosity", help="Prints the detail of the response such as protocol, status, and headers.", action="store_true")
-parser.add_argument("-help",action='help', help='prints this screen')
-parser.add_argument("-h", help="Associates headers to HTTP Request with the format 'key:value'.", metavar="k:v", action='append', nargs="*")
+subparser_get = subparser.add_parser(
+    "get", help="Get executes a HTTP GET request for a given URL.")
 
-parser.add_argument("-d",help="Associates an inline data to the body HTTP POST request.", metavar="inline-data")
-parser.add_argument("-f",help="Associates the content of a file to the body HTTP POST request.", metavar="file")
+
+subparser_post = subparser.add_parser(
+    "post", help="Post executes a HTTP POST request for a given URL with inline data or from file")
+
+group = subparser_post.add_mutually_exclusive_group(required=True)
+group.add_argument(
+    "-d", help="Associates an inline data to the body HTTP POST request.", metavar="inline-data", action='store')
+group.add_argument(
+    "-f", help="Associates the content of a file to the body HTTP POST request.", metavar="file", action='store')
+
 parser.add_argument("URL", help="URL for the GET|POST request")
 
+# python notcurl.py post -d "x" httpbin.org
+
 args = parser.parse_args()
-if args.get and (args.d or args.f):
-    parser.error("GET can't have d or f arguments")
-
-elif args.post and not (bool(args.d) != bool(args.f)):
-    parser.error("POST should only have either d or f argument")
-
-elif args.get:
-    print("execute get method")
-
-elif args.post:
-    print("execute post method")
+print(args)
