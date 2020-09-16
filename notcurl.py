@@ -1,34 +1,8 @@
 import socket
 import argparse
 import json
-
-target_host = "httpbin.org"
-
-target_port = 80  # create a socket object
-client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-# connect the client to the server
-client.connect((target_host, target_port))
-
-# make http request
-request_type = "GET"
-host = "httpbin.org"
-endpoint = "/status/418"
-request = f'''
-{request_type} {endpoint} HTTP/1.0
-Host:{host}
-
-'''
-
-# send http request over TCP
-client.send(request.encode())
-
-# receive http response
-response = client.recv(4096)
-
-# decode and display the response
-# print(response.decode("utf-8"))
-
+import requests
+from urllib.parse import urlparse
 
 # -v, -h(works with "key:value"): Optional Argument, URL(has to be split) : Positional argument 
 #get|post: group arguments, Post can either have -d,-f but not both (optional arguments). GET has nothing
@@ -59,6 +33,36 @@ parser.add_argument("-f",help="Associates the content of a file to the body HTTP
 parser.add_argument("URL", help="URL for the GET|POST request")
 
 args = parser.parse_args()
+
+link = urlparse(args.URL)
+
+# target_host = "httpbin.org"
+
+# target_port = 80  # create a socket object
+# client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+# # connect the client to the server
+# client.connect((target_host, target_port))
+
+# # make http request
+# request_type = "GET"
+# host = link.netloc #"httpbin.org"
+# endpoint = link.path #"/status/418"
+# request = f'''
+# {request_type} {endpoint} HTTP/1.0
+# Host:{host}
+
+# '''
+
+# # send http request over TCP
+# client.send(request.encode())
+
+# # receive http response
+# response = client.recv(4096)
+
+# # decode and display the response
+# print(response.decode("utf-8"))
+
 if args.get and (args.d or args.f):
     parser.error("GET can't have d or f arguments")
 
@@ -67,6 +71,11 @@ elif args.post and not (bool(args.d) != bool(args.f)):
 
 elif args.get:
     print("execute get method")
-
+    getStuff = requests.get(args.URL)
+    print(getStuff.headers)
+    print(getStuff.text)
+   
 elif args.post:
     print("execute post method")
+    header = {args.h}
+    postStuff = requests.post(args.post, params=header)
