@@ -16,6 +16,65 @@ Things to do:
 """
 
 
+def makeRequest(args):
+    header = ''
+    if args.h:
+        header = '\n'.join(args.h)
+
+    if args.get and (args.d or args.f):
+        parser.error("GET can't have d or f arguments")
+
+    elif args.post and not (bool(args.d) != bool(args.f)):
+        parser.error("POST should only have either d or f argument")
+
+    link = urlparse(args.URL)
+
+    target_port = 80  # create a socket object
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    host = link.netloc  # "httpbin.org"
+    endpoint = link.path  # "/status/418"
+    query = link.query
+    endpoint = endpoint + "?" + query if query else endpoint
+
+    # connect the client to the server
+    client.connect((host, target_port))
+
+    request_type = "GET" if args.get else "POST"
+
+    data = ''
+    if request_type == "POST":
+        data = args.d if args.d else open(args.f).read()
+    request = f'''{request_type} {endpoint} HTTP/1.0
+Host:{host}
+{header}
+
+{data}'''
+
+    # send http request over TCP
+    client.send(request.encode())
+
+    # receive http response
+    response = client.recv(8192)
+    receiveData = response.decode("utf-8")
+    pattern = r'^HTTP/1\.\d (30\d)'
+    redirect = re.search(pattern, receiveData)
+    pos = receiveData.find('\r\n\r\n')
+    if redirect:
+        # link for redirection but idk how to test this
+        newURL = re.search(r'Location: (.*)', receiveData)
+        args.URL = newURL.group(1).strip()
+        makeRequest(args)
+        return
+
+    if args.o:
+        outputFile = open(args.o, "w")
+        content = receiveData if args.verbosity else receiveData[pos+4:]
+        outputFile.write(content)
+        outputFile.close()
+    else:
+        print(receiveData) if args.verbosity else print(receiveData[pos+4:])
+
+
 def headerToDict(headers):
     result = {}
     for header in headers:
@@ -55,7 +114,6 @@ parser.add_argument(
     "-o", help="write the body of the response to the specified file.")
 
 args = parser.parse_args()
-print("args\n",args)
 
 if args.help:
     if args.get:
@@ -92,73 +150,21 @@ if args.help:
         Use "httpc help [command]" for more information about a command.'''
     print(helpMessage)
 else:
-    header = ''
-    if args.h:
-        header = '\n'.join(args.h)
-
-    if args.get and (args.d or args.f):
-        parser.error("GET can't have d or f arguments")
-
-    elif args.post and not (bool(args.d) != bool(args.f)):
-        parser.error("POST should only have either d or f argument")
-
-    link = urlparse(args.URL)
-
-    print("link\n",link)
-
-    target_port = 80  # create a socket object
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    host = link.netloc  # "httpbin.org"
-    endpoint = link.path  # "/status/418"
-    query = link.query
-    endpoint = endpoint + "?" + query if query else endpoint
-
-    print("query\n", query)
-
-    # connect the client to the server
-    client.connect((host, target_port))
-
-    request_type = "GET" if args.get else "POST"
-
-    data = ''
-    if request_type == "POST":
-        data = args.d if args.d else open(args.f).read()
-        print("data\n", data)
-    request = f'''
-{request_type} {endpoint} HTTP/1.0
-Host:{host}
-{header}
-
-{data}'''
-    print(request)
-    # send http request over TCP
-    client.send(request.encode())
-
-    # receive http response
-    response = client.recv(4096)
-    receiveData = response.decode("utf-8")
-    pattern = r"^HTTP\/1\.1 30"
-    redirect = re.search(pattern, receiveData)
-    pos = receiveData.find('\r\n\r\n')
-
-    if redirect:
-        newURL = re.search(r"Location: .*", receiveData).split(":").strip() #link for redirection but idk how to test this
-
-    if args.o:
-        outputFile = open(args.o, "w")
-        content = receiveData[pos+4] if args.verbosity else receiveData
-        outputFile.write(content)
-        outputFile.close()
-    else:
-        print(receiveData) if args.verbosity else print(receiveData[pos+4:])
+    makeRequest(args)
     # print(response.decode("utf-8"))
 
 # decode and display the response
 # print(response.decode("utf-8"))
 
+# Get
+# python httpc.py -get -h Nice:One "http://httpbin.org/get?course=networking&assignment=1"
+# python httpc.py -get -v "http://httpbin.org/get?course=networking&assignment=1"
 
-# python notcurl.py -post -h Content-Type:application-json -h Nice:One -d '{"number":2}' http://httpbin.org/post
-# python notcurl.py -post -h Content-Type:application-json -h Nice:One -f datafile.json http://httpbin.org/post
-# python notcurl.py -get -h Nice:One "http://httpbin.org/get?course=networking&assignment=1"
-# python notcurl.py -post -h Content-Type:application/json -d '{"Assignment":1}' http://httpbin.org/post
-# python notcurl.py -get -v "http://httpbin.org/get?course=networking&assignment=1"
+# Post
+# python httpc.py -post -h Content-Type:application/json -d '{"Assignment":1}' http://httpbin.org/post
+# python httpc.py -post -h Content-Type:application-json -h Nice:One -d '{"number":2}' http://httpbin.org/post
+# python httpc.py -post -h Content-Type:application-json -h Nice:One -f datafile.json http://httpbin.org/post
+
+# Redirection
+# python httpc.py -get http://bit.ly/ateapot -v
+# python httpc.py -get http://ddg.co/
