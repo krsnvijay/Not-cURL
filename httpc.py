@@ -3,6 +3,7 @@ import argparse
 import json
 import re
 from urllib.parse import urlparse
+import json
 """
 Things to do:
 1. Change the help message to display help for each command
@@ -20,7 +21,6 @@ def makeRequest(args):
     header = ''
     if args.h:
         header = '\n'.join(args.h)
-
     if args.get and (args.d or args.f):
         parser.error("GET can't have d or f arguments")
 
@@ -44,12 +44,13 @@ def makeRequest(args):
     data = ''
     if request_type == "POST":
         data = args.d if args.d else open(args.f).read()
+        data = data.strip("'")
+        header = header + f"\nContent-Length:{len(data)}"
     request = f'''{request_type} {endpoint} HTTP/1.0
 Host:{host}
 {header}
 
 {data}'''
-
     # send http request over TCP
     client.send(request.encode())
 
@@ -161,8 +162,7 @@ else:
 # python httpc.py -get -v "http://httpbin.org/get?course=networking&assignment=1"
 
 # Post
-# python httpc.py -post -h Content-Type:application/json -d '{"Assignment":1}' http://httpbin.org/post
-# python httpc.py -post -h Content-Type:application-json -h Nice:One -d '{"number":2}' http://httpbin.org/post
+# python httpc.py -post -h Content-Type:application/json -d '{\"Assignment\":1}' http://httpbin.org/post
 # python httpc.py -post -h Content-Type:application-json -h Nice:One -f datafile.json http://httpbin.org/post
 
 # Redirection
