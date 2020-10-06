@@ -1,6 +1,7 @@
 import socket
 import argparse
 import json
+import re
 from urllib.parse import urlparse
 """
 Things to do:
@@ -54,7 +55,7 @@ parser.add_argument(
     "-o", help="write the body of the response to the specified file.")
 
 args = parser.parse_args()
-print(args)
+print("args\n",args)
 header = ''
 if args.h:
     header = '\n'.join(args.h)
@@ -67,7 +68,7 @@ elif args.post and not (bool(args.d) != bool(args.f)):
 
 link = urlparse(args.URL)
 
-print(link)
+print("link\n",link)
 
 target_port = 80  # create a socket object
 client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -75,6 +76,8 @@ host = link.netloc  # "httpbin.org"
 endpoint = link.path  # "/status/418"
 query = link.query
 endpoint = endpoint + "?" + query if query else endpoint
+
+print("query\n", query)
 
 # connect the client to the server
 client.connect((host, target_port))
@@ -84,31 +87,42 @@ request_type = "GET" if args.get else "POST"
 data = ''
 if request_type == "POST":
     data = args.d if args.d else open(args.f).read()
-    print(data)
+    print("data\n", data)
 request = f'''
 {request_type} {endpoint} HTTP/1.0
 Host:{host}
 {header}
 
 {data}'''
-print(request)
+# print(request)
 # send http request over TCP
 client.send(request.encode())
 
 # receive http response
 response = client.recv(4096)
+receiveData = response.decode("utf-8")
+pattern = r"^HTTP\/1\.1 30"
+redirect = re.search(pattern, receiveData)
+pos = receiveData.find('\r\n\r\n')
+
+if redirect:
+    newURL = re.search(r"Location: .*", receiveData).split(":").strip()
 
 if args.o:
     outputFile = open(args.o, "w")
-    outputFile.write(response.decode("utf-8"))
+    content = receiveData[pos+4] if args.verbosity else receiveData
+    outputFile.write(content)
     outputFile.close()
 else:
-    print(response.decode("utf-8"))
+    print(receiveData) if args.verbosity else print(receiveData[pos+4:])
+    # print(response.decode("utf-8"))
 
 # decode and display the response
-print(response.decode("utf-8"))
+# print(response.decode("utf-8"))
 
 
 # python notcurl.py -post -h Content-Type:application-json -h Nice:One -d '{"number":2}' http://httpbin.org/post
 # python notcurl.py -post -h Content-Type:application-json -h Nice:One -f datafile.json http://httpbin.org/post
 # python notcurl.py -get -h Nice:One "http://httpbin.org/get?course=networking&assignment=1"
+# python notcurl.py -post -h Content-Type:application/json -d '{"Assignment":1}' http://httpbin.org/post
+# python notcurl.py -get -v "http://httpbin.org/get?course=networking&assignment=1"
