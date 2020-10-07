@@ -67,6 +67,7 @@ Host:{host}
         # link for redirection but idk how to test this
         newURL = re.search(r'Location: (.*)', receiveData)
         args.URL = newURL.group(1).strip()
+        print(f'\nRedirecting to new URL {args.URL}\n')
         makeRequest(args, counter + 1)
         return
 
