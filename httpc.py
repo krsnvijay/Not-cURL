@@ -17,7 +17,10 @@ Things to do:
 """
 
 
-def makeRequest(args):
+def makeRequest(args, counter=0):
+    if counter > 5:
+        print("Max Redirection Limit Reached")
+        return
     header = ''
     if args.h:
         header = '\n'.join(args.h)
@@ -64,7 +67,7 @@ Host:{host}
         # link for redirection but idk how to test this
         newURL = re.search(r'Location: (.*)', receiveData)
         args.URL = newURL.group(1).strip()
-        makeRequest(args)
+        makeRequest(args, counter + 1)
         return
 
     if args.o:
