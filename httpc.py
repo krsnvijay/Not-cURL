@@ -59,6 +59,9 @@ Host:{host}
 
     # receive http response
     response = client.recv(8192)
+    print(request)
+    print()
+    print(response)
     receiveData = response.decode("utf-8")
     pattern = r'^HTTP/1\.\d (30\d)'
     redirect = re.search(pattern, receiveData)
@@ -158,6 +161,11 @@ else:
     makeRequest(args)
     # print(response.decode("utf-8"))
 
+
+# python httpc.py -help
+# python httpc.py -help -get
+# python httpc.py -help -post
+
 # decode and display the response
 # print(response.decode("utf-8"))
 
@@ -166,9 +174,22 @@ else:
 # python httpc.py -get -v "http://httpbin.org/get?course=networking&assignment=1"
 
 # Post
-# python httpc.py -post -h Content-Type:application/json -d '{\"Assignment\":1}' http://httpbin.org/post
-# python httpc.py -post -h Content-Type:application-json -h Nice:One -f datafile.json http://httpbin.org/post
+# python httpc.py -post -h Content-Type:application/json -d '{\"Assignment\":1}' "http://httpbin.org/post"
+# python httpc.py -post -h Content-Type:application/json -h Nice:One -f datafile.json http://httpbin.org/post
 
 # Redirection
+# python httpc.py -get -h Authorization:None -h "Content-Type":"application/json" "http://httpbin.org/get?course=networking&assignment=1" -o output.txt
 # python httpc.py -get http://bit.ly/ateapot -v
-# python httpc.py -get http://ddg.co/
+# python httpc.py -get http://ca.yahoo.com/
+
+
+# python httpc.py -get "http://httpbin.org/get"
+# python httpc.py -get -h Authorization:None "http://httpbin.org/get?course=networking&assignment=1" -o
+# python httpc.py -get -h Authorization:None -h "Content-Type":"application/json" "http://httpbin.org/get?course=networking&assignment=1"
+# python httpc.py -get -v Authorization:None -h "Content-Type":"application/json" "http://httpbin.org/get?course=networking&assignment=1"
+
+# python httpc.py -post -h "Content-Type":"application/json" -d '{"Assignment":1,"Demo":10}' "http://httpbin.org/post"
+# python httpc.py -post -h "Content-Type":"application/json" -h Authorization:None -f datafile.json "http://httpbin.org/post"
+
+# python httpc.py -get -v http://bit.ly/cybernauts
+# python httpc.py -get -v -h Authorization:None -h "Content-Type":"application/json" -o output.txt "http://httpbin.org/get?course=networking&assignment=1"

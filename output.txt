@@ -1,0 +1,18 @@
+{
+  "args": {}, 
+  "data": "{\"Today\":\"today\"}", 
+  "files": {}, 
+  "form": {}, 
+  "headers": {
+    "Authorization": "None", 
+    "Content-Length": "17", 
+    "Content-Type": "application/json", 
+    "Host": "httpbin.org", 
+    "X-Amzn-Trace-Id": "Root=1-5f8afb31-2dc10fb414dba86f1a3b1637"
+  }, 
+  "json": {
+    "Today": "today"
+  }, 
+  "origin": "86.106.90.94", 
+  "url": "http://httpbin.org/post"
+}
