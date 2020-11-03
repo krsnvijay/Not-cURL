@@ -32,7 +32,7 @@ def makeRequest(args, counter=0):
 
     link = urlparse(args.URL)
 
-    target_port = 80  # create a socket object
+    target_port = 8080  # create a socket object
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host = link.netloc  # "httpbin.org"
     endpoint = link.path  # "/status/418"
@@ -41,7 +41,6 @@ def makeRequest(args, counter=0):
 
     # connect the client to the server
     client.connect((host, target_port))
-
     request_type = "GET" if args.get else "POST"
 
     data = ''
@@ -56,12 +55,8 @@ Host:{host}
 {data}'''
     # send http request over TCP
     client.send(request.encode())
-
     # receive http response
     response = client.recv(8192)
-    print(request)
-    print()
-    print(response)
     receiveData = response.decode("utf-8")
     pattern = r'^HTTP/1\.\d (30\d)'
     redirect = re.search(pattern, receiveData)

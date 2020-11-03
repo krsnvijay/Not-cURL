@@ -1,5 +1,46 @@
 import socket
+import threading
 import argparse
+
+
+def run_server(host, port):
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        listener.bind((host, port))
+        listener.listen(5)
+        print('Echo server is listening at', port)
+        while True:
+            conn, addr = listener.accept()
+            threading.Thread(target=handle_client, args=(conn, addr)).start()
+    finally:
+        listener.close()
+
+
+def handle_client(conn, addr):
+    print('New client from', addr)
+    try:
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            data = data.decode("utf-8").split("\n")
+            method, path, version = data[0].split(" ")
+            path = path.lstrip("/")
+            body = ""
+            if method == "GET":
+                print("Reading from file")
+                with open(path, 'r') as f:
+                    body = f.read()
+            elif method == "POST":
+                print("Writing to file")
+
+            response = f'''HTTP/1.0 200 OK
+            
+            {body}'''
+            conn.sendall(response.encode("utf-8"))
+    finally:
+        conn.close()
+
 
 """
 httpfs is a simple file server.
@@ -18,8 +59,13 @@ parser = argparse.ArgumentParser(
     prog="httpfs"
 )
 
-parser.add_argument("-v",help="Prints debugging messages.", action="store_true")
-parser.add_argument("-p","--port", default=8008,help="Specifies the port number that the server will listen and serve at. Default is 8080.")
-parser.add_argument("-d","--directory", default="/",help="Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
+parser.add_argument("-v", help="Prints debugging messages.",
+                    action="store_true")
+parser.add_argument("-p", "--port", type=int, default=8080,
+                    help="Specifies the port number that the server will listen and serve at. Default is 8080.")
+parser.add_argument("-d", "--directory", default="/",
+                    help="Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
 
 args = parser.parse_args()
+
+run_server('', args.port)
