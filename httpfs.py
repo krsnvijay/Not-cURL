@@ -9,7 +9,7 @@ def run_server(host, port):
     try:
         listener.bind((host, port))
         listener.listen(5)
-        print('Echo server is listening at', port)
+        print('File server is listening at', port)
         while True:
             conn, addr = listener.accept()
             threading.Thread(target=handle_client, args=(conn, addr)).start()
@@ -24,20 +24,37 @@ def handle_client(conn, addr):
             data = conn.recv(1024)
             if not data:
                 break
-            data = data.decode("utf-8").split("\n")
-            method, path, version = data[0].split(" ")
+            data = data.decode("utf-8")
+            # TODO, Pos does not actually find start position of body, needs fixing
+            pos = data.find('\r\n\r\n')
+            lines = data.split("\n")
+            method, path, version = lines[0].split(" ")
+
             path = path.lstrip("/")
             body = ""
-            if method == "GET":
-                print("Reading from file")
+            # If path is root, list files
+            if path == "":
+                currentDirectory = pathlib.Path('.')
+                files = [str(f) for f in currentDirectory.iterdir()]
+                body = "\n".join(files)
+
+            # Handle path for get request (read if exists)
+            elif method == "GET":
+                print("Reading from file 📖")
                 with open(path, 'r') as f:
                     body = f.read()
+
+            # Handle path for post request (create or overwrite)
             elif method == "POST":
                 print("Writing to file")
+                with open(path, 'w') as f:
+                    f.write(data[pos+4:])
+                    body = "Wrote content to file 🖨"
 
+            # Give success/fail response codes
             response = f'''HTTP/1.0 200 OK
-            
-            {body}'''
+
+{body}'''
             conn.sendall(response.encode("utf-8"))
     finally:
         conn.close()
@@ -79,4 +96,11 @@ run_server('', args.port)
 # Server
 # python httpfs.py
 # Client
+# list files
+# python httpc.py -get "http://localhost"
+
+# read file
 # python httpc.py -get "https://localhost/out.txt"
+
+# write file
+# python httpc.py -post "https://localhost/nice.txt" -f "datafile.json"
