@@ -1,6 +1,7 @@
 import socket
 import threading
 import argparse
+import pathlib
 
 
 def run_server(host, port):
@@ -59,13 +60,23 @@ parser = argparse.ArgumentParser(
     prog="httpfs"
 )
 
+default_port = 8080
+default_path = pathlib.Path().absolute()
+
+print(default_path)
+
 parser.add_argument("-v", help="Prints debugging messages.",
                     action="store_true")
-parser.add_argument("-p", "--port", type=int, default=8080,
+parser.add_argument("-p", "--port", default=default_port,
                     help="Specifies the port number that the server will listen and serve at. Default is 8080.")
-parser.add_argument("-d", "--directory", default="/",
+parser.add_argument("-d", "--directory", default=default_path,
                     help="Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
 
 args = parser.parse_args()
 
 run_server('', args.port)
+
+# Server
+# python httpfs.py
+# Client
+# python httpc.py -get "https://localhost/out.txt"
