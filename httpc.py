@@ -40,6 +40,7 @@ def makeRequest(args, counter=0):
     endpoint = endpoint + "?" + query if query else endpoint
 
     # connect the client to the server
+    print("host ", host, " target ", target_port)
     client.connect((host, target_port))
 
     request_type = "GET" if args.get else "POST"
