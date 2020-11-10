@@ -2,6 +2,8 @@ import socket
 import threading
 import argparse
 import pathlib
+import os
+import re
 
 
 def run_server(host, port):
@@ -18,6 +20,13 @@ def run_server(host, port):
 
 
 def handle_client(conn, addr):
+    headers = {
+        "Content-Disposition": "",
+        "Content-Type": ""
+    }
+
+    blank_line = "\n"
+
     print('New client from', addr)
     try:
         while True:
@@ -40,9 +49,21 @@ def handle_client(conn, addr):
 
             # Handle path for get request (read if exists)
             elif method == "GET":
-                print("Reading from file 📖")
-                with open(path, 'r') as f:
-                    body = f.read()
+                if re.search(r"[\/].+", path):
+                    response_line = "   HTTP/1.0 403 Forbidden\n"
+                    response_body = "User doesn't have required permissions"
+                elif os.path.exists(path):
+                    print("Reading from file 📖")
+                    headers["Content-Type"] = "text/plain\n" if path.split(".")[1] == "txt" else "application/json\n"
+                    headers["Content-Disposition"] = "inline"
+                    with open(path, 'r') as f:
+                        body = f.read()
+                        response_line = "   HTTP/1.0 200 OK\n"
+                        response_body = f'''{body}'''
+                else:
+                    print("No such file exists")
+                    response_line= "   HTTP/1.0 404 Not Found\n"
+                    response_body= "Requested file doesn't exist"
 
             # Handle path for post request (create or overwrite)
             elif method == "POST":
@@ -52,9 +73,12 @@ def handle_client(conn, addr):
                     body = "Wrote content to file 🖨"
 
             # Give success/fail response codes
-            response = f'''HTTP/1.0 200 OK
-
-{body}'''
+            header = ""
+            for h in headers:
+                header += "%s: %s\n" % (h, headers[h])
+            print(header)
+            response = "".join([response_line, header, blank_line, response_body])
+            print("response ", response)
             conn.sendall(response.encode("utf-8"))
     finally:
         conn.close()
