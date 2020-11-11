@@ -21,9 +21,9 @@ def makeRequest(args, counter=0):
     if counter > 5:
         print("Max Redirection Limit Reached")
         return
-    header = ''
+    header = []
     if args.h:
-        header = '\n'.join(args.h)
+        header = args.h[:]
     if args.get and (args.d or args.f):
         parser.error("GET can't have d or f arguments")
 
@@ -43,16 +43,18 @@ def makeRequest(args, counter=0):
     client.connect((host, target_port))
     request_type = "GET" if args.get else "POST"
 
+    if endpoint == '':
+        endpoint = "/"
     data = ''
     if request_type == "POST":
         data = args.d if args.d else open(args.f).read()
         data = data.strip("'")
-        header = header + f"\nContent-Length:{len(data)}"
-    request = f'''{request_type} {endpoint} HTTP/1.0
-Host:{host}
-{header}
+        header.append(f"Content-Length: {len(data)}")
+    request_line = f'{request_type} {endpoint} HTTP/1.0'
+    host = f'Host: {host}'
+    blank_line = ''
+    request = '\r\n'.join([request_line,host,*header,blank_line,data])
 
-{data}'''
     # send http request over TCP
     client.send(request.encode())
     # receive http response

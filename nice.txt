@@ -1,6 +1,0 @@
-T /nice.txt HTTP/1.0
-Host:localhost
-
-Content-Length:33
-
-{ "nice": 1, "6461": "Networks" }
