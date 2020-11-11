@@ -4,8 +4,7 @@ import argparse
 import pathlib
 import os
 import mimetypes
-
-
+from readerswriterlock import ReadersWriterLock
 def make_http_response(headers, body, status=200):
     status_info = {
         200: 'OK',
@@ -75,6 +74,9 @@ class SimpleFTPServer(BaseTCPServer):
         print("Serving files in", self.directory)
         super().__init__(host, port, debug)
 
+        self.files = {}
+
+
     def handle_request(self, conn, data):
         """Handles incoming requests"""
         data = conn.recv(4096)
@@ -123,22 +125,30 @@ class SimpleFTPServer(BaseTCPServer):
         # Guess Content-Type from file extension
         content_type = mimetypes.guess_type(file_path.resolve())
         headers.append(f"Content-Type: {content_type[0]}")
-        with open(file_path, 'r') as f:
-            body = f.read()
-            response = make_http_response(headers, body, 200)
-            return response
+        absolute_file_path = file_path.resolve()
+        if absolute_file_path not in self.files:
+            self.files[absolute_file_path] = ReadersWriterLock()
+        with self.files[absolute_file_path].readers_locked():
+            with open(file_path, 'r') as f:
+                body = f.read()
+                response = make_http_response(headers, body, 200)
+                return response
 
     def write_file(self, request):
         headers = []
-        file_path = pathlib.Path(request["path"])
+        file_path = self.directory.joinpath(request["path"])
         # Can write only in the working directory
         if file_path.resolve().parent != self.directory.resolve():
             response = make_http_response(headers, "User doesn't have required permissions", 403)
             return response
-        with open(file_path, 'w') as f:
-            f.write(request["body"])
-            response = make_http_response(headers, "Wrote content to file", 200)
-            return response
+        absolute_file_path = file_path.resolve()
+        if absolute_file_path not in self.files:
+            self.files[absolute_file_path] = ReadersWriterLock()
+        with self.files[absolute_file_path].writer_locked():
+            with open(file_path, 'w') as f:
+                f.write(request["body"])
+                response = make_http_response(headers, "Wrote content to file", 200)
+                return response
 
 
 """
@@ -151,30 +161,31 @@ usage: httpfs [-v] [-p PORT] [-d PATH-TO-DIR]
 -d  Specifies the directory that the server will use to read/write requested files. 
     Default is the current directory when launching the application.
 """
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="httpfs is a simple file server.",
+        usage='''\n%(prog)s [-v] [-p PORT] [-d PATH-TO-DIR]''',
+        prog="httpfs"
+    )
 
-parser = argparse.ArgumentParser(
-    description="httpfs is a simple file server.",
-    usage='''\n%(prog)s [-v] [-p PORT] [-d PATH-TO-DIR]''',
-    prog="httpfs"
-)
-
-default_port = 8080
-default_path = pathlib.Path().absolute()
+    default_port = 8080
+    default_path = pathlib.Path().absolute()
 
 
-parser.add_argument("-v", help="Prints debugging messages.",
-                    action="store_true")
-parser.add_argument("-p", "--port", default=default_port,
-                    help="Specifies the port number that the server will listen and serve at. Default is 8080.")
-parser.add_argument("-d", "--directory", default=default_path,
-                    help="Specifies the directory that the server will use to read/write requested files. Default is the current directory when launching the application.")
+    parser.add_argument("-v", help="Prints debugging messages.",
+                        action="store_true")
+    parser.add_argument("-p", "--port", default=default_port,
+                        help="Specifies the port number that the server will listen and serve at. Default is 8080.")
+    parser.add_argument("-d", "--directory", default=default_path,
+                        help="Specifies the directory that the server will use to read/write requested files. Default is "
+                             "the current directory when launching the application.")
 
-args = parser.parse_args()
+    args = parser.parse_args()
 
-if args.v:
-    print(args)
-server = SimpleFTPServer(port=args.port, debug=args.v, directory=args.directory)
-server.run_server()
+    if args.v:
+        print(args)
+    server = SimpleFTPServer(port=args.port, debug=args.v, directory=args.directory)
+    server.run_server()
 
 # Server
 # python httpfs.py
@@ -200,3 +211,6 @@ server.run_server()
 # python httpc.py -get "http://localhost/another.json"
 # python httpc.py -get "http://localhost/nice.txt"
 # python httpc.py -get "http://localhost/food.xml"
+
+# concurrency check
+# python concurrency_check.py
