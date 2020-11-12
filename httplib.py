@@ -2,6 +2,7 @@ import socket
 import threading
 import logging
 
+
 def recvall(sock):
     fragments = []
     while True:
@@ -11,8 +12,10 @@ def recvall(sock):
         fragments.append(chunk)
     return b''.join(fragments)
 
+
 def make_http_response(headers, body, status=200):
     status_info = {
+        400: 'Bad Request',
         200: 'OK',
         404: 'Not Found',
         403: 'Forbidden',
@@ -91,19 +94,26 @@ class BaseTCPServer:
     def handle_request(self, conn, data):
         data = conn.recv(4096)
         logging.debug(f'(request)  {data}')
-        request = parse_http_request(data)  # Get a parsed HTTP request
-        # Invoke get or post handler based on the request type
-        request_handler = getattr(self, 'handle_%s' % request["method"])
-        response = request_handler(request)
-        logging.debug(f'(response) {response.encode("utf-8")}')
-        conn.sendall(response.encode("utf-8"))
-        return data
-
+        try:
+            if len(data) == 0:
+                raise Exception(400, "Bad Request")
+            request = parse_http_request(data)  # Get a parsed HTTP request
+            # Invoke get or post handler based on the request type
+            request_handler = getattr(self, 'handle_%s' % request["method"])
+            response = request_handler(request)
+            logging.debug(f'(response) {response.encode("utf-8")}')
+            conn.sendall(response.encode("utf-8"))
+        except Exception as e:
+            code,reason = e.args
+            response = make_http_response([], reason, code)
+            logging.debug(f'(response) {response.encode("utf-8")}')
+            conn.sendall(response.encode("utf-8"))
+        finally:
+            conn.close()
 
     def handle_GET(self, request):
         # Will be overriden in derived class
         pass
-
 
     def handle_POST(self, request):
         # Will be overriden in derived class
