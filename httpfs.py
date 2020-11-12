@@ -30,7 +30,8 @@ class SimpleFTPServer(BaseTCPServer):
         files = [str(f) for f in self.directory.iterdir()]
         body = "\r\n".join(files)
         headers = [
-            "Content-Disposition: inline"
+            "Content-Disposition: inline",
+            "Content-Type: text/plain"
         ]
         response = make_http_response(headers, body, 200)
         return response
@@ -39,11 +40,15 @@ class SimpleFTPServer(BaseTCPServer):
         headers = []
         file_path = self.directory.joinpath(request["path"])
         if not file_path.exists() or file_path.is_dir():
+            headers.append(f"Content-Type: text/plain")
+            headers.append("Content-Disposition: inline")
             response = make_http_response(headers, "Requested file doesn't exist", 404)
             return response
 
         # Only read file if its from the same working directory
         if file_path.resolve().parent != self.directory.resolve():
+            headers.append(f"Content-Type: text/plain")
+            headers.append("Content-Disposition: inline")
             response = make_http_response(headers, "User doesn't have required permissions", 403)
             return response
 
@@ -63,7 +68,7 @@ class SimpleFTPServer(BaseTCPServer):
                 return response
 
     def write_file(self, request):
-        headers = []
+        headers = [f"Content-Type: text/plain", "Content-Disposition: inline"]
         file_path = self.directory.joinpath(request["path"])
         # Can write only in the working directory
         if file_path.resolve().parent != self.directory.resolve():
@@ -138,8 +143,8 @@ if __name__ == "__main__":
 
 # Test path permission - security
 # python httpfs.py -v -d "C:\Users\Not A Hero\OneDrive\Desktop\6461-1\fs"
-# python httpc.py -get "http://localhost/../fs/nice.txt"
-# python httpc.py -get "http://localhost/nice.json"
+# python httpc.py -v -get "http://localhost/../fs/nice.txt"
+# python httpc.py -v -get "http://localhost/nice.json"
 
 # ContentType and Disposition
 # python httpc.py -get "http://localhost/another.json"

@@ -33,10 +33,9 @@ def makeRequest(args, counter=0):
         parser.error("POST should only have either d or f argument")
 
     link = urlparse(args.URL)
-
-    target_port = 8080  # create a socket object
+    target_port = link.port  # create a socket object
     client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    host = link.netloc  # "httpbin.org"
+    host = link.hostname  # "httpbin.org"
     endpoint = link.path  # "/status/418"
     query = link.query
     if endpoint == '':
