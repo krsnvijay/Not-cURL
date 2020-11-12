@@ -1,69 +1,11 @@
-import socket
-import threading
+
 import argparse
 import pathlib
 import os
 import mimetypes
 from readerswriterlock import ReadersWriterLock
-def make_http_response(headers, body, status=200):
-    status_info = {
-        200: 'OK',
-        404: 'Not Found',
-        403: 'Forbidden',
-        501: 'Not Implemented',
-    }
-    response_line = f"HTTP/1.0 {status} {status_info[status]}"
-    blank_line = ''
-    return '\r\n'.join([response_line, *headers, blank_line, body])
-
-
-def parse_http_request(data):
-    data = data.decode("utf-8")
-    lines = data.split("\r\n")
-    request_line = lines[0].split(" ")
-    header_len = 0
-    for headerLine in lines[1:]:
-        header_len += 1
-        if len(headerLine) == 0:
-            break
-    headers = lines[1:header_len]
-    body = '\r\n'.join(lines[header_len + 1:])
-    request = {
-        "method": request_line[0],
-        "path": request_line[1].lstrip("/"),
-        "version": request_line[2],
-        "headers": headers,
-        "body": body
-    }
-    return request
-
-
-class BaseTCPServer:
-    def __init__(self, host='127.0.0.1', port=8080, debug=False):
-        self.host = host
-        self.port = port
-        self.debug = debug
-
-    def run_server(self):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.bind((self.host, self.port))
-        s.listen(5)
-        try:
-            print("Server Listening for connections at", s.getsockname())
-            while True:
-                conn, addr = s.accept()
-                print("New Connection by ", addr)
-                threading.Thread(target=self.handle_request, args=(conn, addr)).start()
-
-        finally:
-            s.close()
-
-    def handle_request(self, conn, data):
-        """Handles incoming data and returns a response.
-        Override this in subclass.
-        """
-        return data
-
+from httplib import BaseTCPServer, make_http_response, parse_http_request
+import logging
 
 class SimpleFTPServer(BaseTCPServer):
 
@@ -71,24 +13,9 @@ class SimpleFTPServer(BaseTCPServer):
         if directory is None:
             directory = os.getcwd()
         self.directory = pathlib.Path(directory)
-        print("Serving files in", self.directory)
+        logging.info(f"Serving files in {self.directory}")
         super().__init__(host, port, debug)
-
         self.files = {}
-
-
-    def handle_request(self, conn, data):
-        """Handles incoming requests"""
-        data = conn.recv(4096)
-        request = parse_http_request(data)  # Get a parsed HTTP request
-
-        request_handler = getattr(self, 'handle_%s' % request["method"])
-        response = request_handler(request)
-        if self.debug:
-            print(data)
-            print(request)
-            print(response)
-        conn.sendall(response.encode("utf-8"))
 
     def handle_GET(self, request):
         if request["path"] == "":
@@ -171,7 +98,6 @@ if __name__ == "__main__":
     default_port = 8080
     default_path = pathlib.Path().absolute()
 
-
     parser.add_argument("-v", help="Prints debugging messages.",
                         action="store_true")
     parser.add_argument("-p", "--port", default=default_port,
@@ -183,7 +109,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.v:
-        print(args)
+        log_level = "DEBUG"
+        fmt = '%(asctime)s %(threadName)s %(message)s'
+    else:
+        log_level = "INFO"
+        fmt = '%(asctime)s %(message)s'
+    logging.basicConfig(format=fmt,
+                        level=os.environ.get("LOGLEVEL", log_level))
     server = SimpleFTPServer(port=args.port, debug=args.v, directory=args.directory)
     server.run_server()
 
