@@ -53,6 +53,7 @@ class SimpleFTPServer(BaseTCPServer):
         content_type = mimetypes.guess_type(file_path.resolve())
         headers.append(f"Content-Type: {content_type[0]}")
         absolute_file_path = file_path.resolve()
+        # Get readwrite lock for a file
         if absolute_file_path not in self.files:
             self.files[absolute_file_path] = ReadersWriterLock()
         with self.files[absolute_file_path].readers_locked():
@@ -69,6 +70,7 @@ class SimpleFTPServer(BaseTCPServer):
             response = make_http_response(headers, "User doesn't have required permissions", 403)
             return response
         absolute_file_path = file_path.resolve()
+        # Get readwrite lock for a file
         if absolute_file_path not in self.files:
             self.files[absolute_file_path] = ReadersWriterLock()
         with self.files[absolute_file_path].writer_locked():

@@ -82,6 +82,7 @@ class BaseTCPServer:
             while True:
                 conn, addr = s.accept()
                 logging.info(f"New Connection by {addr}")
+                # Create a thread everytime there's a new request
                 threading.Thread(target=self.handle_request, args=(conn, addr)).start()
 
         finally:
@@ -91,6 +92,7 @@ class BaseTCPServer:
         data = conn.recv(4096)
         logging.debug(f'(request)  {data}')
         request = parse_http_request(data)  # Get a parsed HTTP request
+        # Invoke get or post handler based on the request type
         request_handler = getattr(self, 'handle_%s' % request["method"])
         response = request_handler(request)
         logging.debug(f'(response) {response.encode("utf-8")}')
@@ -98,9 +100,11 @@ class BaseTCPServer:
         return data
 
 
-def handle_GET(self, request):
-    pass
+    def handle_GET(self, request):
+        # Will be overriden in derived class
+        pass
 
 
-def handle_POST(self, request):
-    pass
+    def handle_POST(self, request):
+        # Will be overriden in derived class
+        pass
