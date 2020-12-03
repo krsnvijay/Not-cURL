@@ -1,4 +1,3 @@
-
 import argparse
 import pathlib
 import os
@@ -6,6 +5,8 @@ import mimetypes
 from readerswriterlock import ReadersWriterLock
 from httplib import BaseUDPServer, make_http_response, parse_http_request
 import logging
+
+
 # from udp_server import
 
 class SimpleFTPServer(BaseUDPServer):
@@ -56,7 +57,7 @@ class SimpleFTPServer(BaseUDPServer):
         headers.append("Content-Disposition: inline")
 
         # Guess Content-Type from file extension
-        content_type = mimetypes.guess_type(file_path.resolve())
+        content_type = mimetypes.guess_type(str(file_path.resolve()))
         headers.append(f"Content-Type: {content_type[0]}")
         absolute_file_path = file_path.resolve()
         # Get readwrite lock for a file

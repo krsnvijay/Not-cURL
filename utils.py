@@ -1,16 +1,19 @@
+import ipaddress
+
 from packet import Packet, SYN_ACK, SYN, ACK, NAK, DATA, FIN
 
 TIMEOUT = 5
 
 
-def split_data_into_packets(data, peer, seq = 0, packet_type=DATA, payload_size=1013):
-    peer_ip_addr, peer_port = peer
+def split_data_into_packets(data, peer, seq=0, packet_type=DATA, payload_size=1012):
+    peer_ip_addr, peer_port = ipaddress.ip_address(peer[0]), peer[1]
     packets = []
     # split data based on packet size
     # create packet
+    data = data.encode("utf-8")
     while seq * payload_size < len(data):
         payload = data[seq * payload_size: (seq + 1) * payload_size]
-        p = Packet(packet_type, seq + 1, peer_ip_addr, peer_port, payload.encode("utf-8"))
+        p = Packet(packet_type, seq + 1, peer_ip_addr, peer_port, payload)
         packets.append(p)
         seq += 1
     return packets
@@ -25,7 +28,7 @@ def combine_packets_into_data(packets):
 
 
 def make_ack(packet_type, seq_num, peer, payload=''):
-    peer_ip_addr, peer_port = peer
+    peer_ip_addr, peer_port = ipaddress.ip_address(peer[0]), peer[1]
     return Packet(packet_type, seq_num, peer_ip_addr, peer_port, payload.encode("utf-8"))
 
 

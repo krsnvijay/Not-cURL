@@ -1,4 +1,6 @@
 import ipaddress
+import logging
+import os
 import socket
 import argparse
 import json
@@ -10,6 +12,7 @@ from httplib import parse_http_response, make_http_request
 from udp_client import establish_handshake
 from utils import split_data_into_packets, make_ack, FIN, ACK
 from packet import Packet
+from httplib import BaseUDPClient
 
 
 def makeRequest(args, counter=0):
@@ -25,15 +28,14 @@ def makeRequest(args, counter=0):
     elif args.post and not (bool(args.d) != bool(args.f)):
         parser.error("POST should only have either d or f argument")
 
-
     link = urlparse(args.URL)
     target_port = int(link.port)  # create a socket object
     host = link.hostname  # "httpbin.org"
     peer = (ipaddress.ip_address(host), target_port)
-    client, router = establish_handshake(host, target_port)
-    if client is None:
-        print("Handshake failed")
-        sys.exit(0)
+    router = ("127.0.0.1", 3000)
+    client = BaseUDPClient(router, host, target_port, True)
+    client.handshake_client()
+
     endpoint = link.path  # "/status/418"
     query = link.query
     if endpoint == '':
@@ -43,7 +45,6 @@ def makeRequest(args, counter=0):
 
     # connect the client to the server
 
-
     data = ''
     if request_type == "POST":
         data = args.d if args.d else open(args.f).read()
@@ -51,37 +52,11 @@ def makeRequest(args, counter=0):
         header.append(f"Content-Length: {len(data)}")
     header.insert(0, f'Host: {host}')
     request = make_http_request(request_type, endpoint, header, data)
-    packets = split_data_into_packets(request, peer)
-    print(packets, request)
-    fin = make_ack(FIN, len(packets) + 1, peer)
-    packets.append(fin)
-    for packet in packets:
-        client.sendto(packet.to_bytes(), router)
-        received_data, sender = client.recvfrom(1024)
-        p = Packet.from_bytes(received_data)
-        if p.packet_type != ACK:
-            break
+    client.send_request(request)
     # send http request over TCP
 
     # receive http response
-
-    payload = []
-    while True:
-        raw_data, sender = client.recvfrom(1024)
-        data_packet = Packet.from_bytes(raw_data)
-        print("Packet: ", data_packet)
-        print("Payload: ", data_packet.payload.decode("utf-8"))
-        ack = make_ack(ACK, data_packet.seq_num, host)
-        client.sendto(ack.to_bytes(), sender)
-        print("Ack: ", ack)
-        if data_packet.packet_type == FIN:
-            print("LastPacket: ", ack)
-            break
-        else:
-            payload.append(data_packet.payload.decode("utf-8"))
-
-
-    raw_response = ''.join(payload)
+    raw_response = client.receive_response()
     response = parse_http_response(raw_response)
 
     if response["status"] == 301:
@@ -92,7 +67,7 @@ def makeRequest(args, counter=0):
         makeRequest(args, counter + 1)
         return
 
-    content = raw_response if args.verbosity else response["body"]
+    content = raw_response.decode("utf-8") if args.verbosity else response["body"]
     if args.o:
         with open(args.o, "w") as output_file:
             output_file.write(content)
@@ -138,6 +113,7 @@ if __name__ == "__main__":
     parser = get_parser()
     args = parser.parse_args()
 
+    logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
     if args.help:
         if args.get:
             helpMessage = f'''
