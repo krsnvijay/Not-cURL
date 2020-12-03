@@ -1,16 +1,12 @@
 import argparse
 import socket
 
-from packet import Packet
+from packet import Packet, SYN_ACK, SYN, NAK, ACK, FIN
 from utils import make_ack, receive
 
 established = False
 TIMEOUT = 5
-SYN = 0
-SYN_ACK = 1
-ACK = 2
-NAK = 3
-FIN = 4
+
 
 def run_server(port):
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -19,13 +15,13 @@ def run_server(port):
         print('Echo server is listening at', port)
         while True:
             data, sender = conn.recvfrom(1024)
-            handle_client(conn, data, sender)
+            establish_handshake_server(conn, data, sender)
 
     finally:
         conn.close()
 
 
-def handle_client(conn, data, sender):
+def establish_handshake_server(conn, data, sender):
     global established
     try:
         p = Packet.from_bytes(data)
@@ -39,13 +35,13 @@ def handle_client(conn, data, sender):
                 p_synack = Packet(SYN_ACK, 0, peer_ip_addr, peer_port, "Hi R".encode("utf-8"))
                 conn.sendto(p_synack.to_bytes(), sender)
                 print("sending syn_ack")
-            elif p.packet_type == SYN_ACK:
+            elif p.packet_type == ACK:
                 print("ACK!!")
                 established = True
-        else:
-            p_ack = Packet(ACK, 0, peer_ip_addr, peer_port, p.payload)
-            conn.sendto(p_ack.to_bytes(), sender)
-            print("Handshake done.")
+        # else:
+        #         #     p_ack = Packet(ACK, 0, peer_ip_addr, peer_port, p.payload)
+        #         #     conn.sendto(p_ack.to_bytes(), sender)
+        #         #     print("Handshake done.")
         # request = receive(conn, sender, data)
         # How to send a reply.
         # The peer address of the packet p is the address of the client already.
@@ -54,6 +50,9 @@ def handle_client(conn, data, sender):
 
     except Exception as e:
         print("Error: ", e)
+
+    finally:
+        return conn
 
 
 def handshake(p, conn, sender):
@@ -69,7 +68,9 @@ def handshake(p, conn, sender):
 
 
 # Usage python udp_server.py [--port port-number]
-parser = argparse.ArgumentParser()
-parser.add_argument("--port", help="echo server port", type=int, default=8008)
-args = parser.parse_args()
-run_server(args.port)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", help="echo server port", type=int, default=8008)
+    args = parser.parse_args()
+    run_server(args.port)

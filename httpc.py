@@ -1,22 +1,15 @@
+import ipaddress
 import socket
 import argparse
 import json
 import re
+import sys
 from urllib.parse import urlparse
 import json
 from httplib import parse_http_response, make_http_request
-
-"""
-Things to do:
-1. Change the help message to display help for each command
-2. Fix UGLY code :)
-3. Headers aren't properly formatted
-4. Saving to file always writes headers too. Can use if/else but it's very redundant so idk :|
-5. Redirection (requests.get allows redirection by default)
-6. changes to args.h so it works for multiple headers  :)
-7. Haven't tested -f :|
-8. Handle Verbosity
-"""
+from udp_client import establish_handshake
+from utils import split_data_into_packets, make_ack, FIN, ACK
+from packet import Packet
 
 
 def makeRequest(args, counter=0):
@@ -32,10 +25,15 @@ def makeRequest(args, counter=0):
     elif args.post and not (bool(args.d) != bool(args.f)):
         parser.error("POST should only have either d or f argument")
 
+
     link = urlparse(args.URL)
-    target_port = link.port  # create a socket object
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    target_port = int(link.port)  # create a socket object
     host = link.hostname  # "httpbin.org"
+    peer = (ipaddress.ip_address(host), target_port)
+    client, router = establish_handshake(host, target_port)
+    if client is None:
+        print("Handshake failed")
+        sys.exit(0)
     endpoint = link.path  # "/status/418"
     query = link.query
     if endpoint == '':
@@ -44,7 +42,7 @@ def makeRequest(args, counter=0):
     request_type = "GET" if args.get else "POST"
 
     # connect the client to the server
-    client.connect((host, target_port))
+
 
     data = ''
     if request_type == "POST":
@@ -53,12 +51,37 @@ def makeRequest(args, counter=0):
         header.append(f"Content-Length: {len(data)}")
     header.insert(0, f'Host: {host}')
     request = make_http_request(request_type, endpoint, header, data)
-
+    packets = split_data_into_packets(request, peer)
+    print(packets, request)
+    fin = make_ack(FIN, len(packets) + 1, peer)
+    packets.append(fin)
+    for packet in packets:
+        client.sendto(packet.to_bytes(), router)
+        received_data, sender = client.recvfrom(1024)
+        p = Packet.from_bytes(received_data)
+        if p.packet_type != ACK:
+            break
     # send http request over TCP
-    client.send(request.encode())
+
     # receive http response
-    raw_response = client.recv(8192)
-    receiveData = raw_response.decode("utf-8")
+
+    payload = []
+    while True:
+        raw_data, sender = client.recvfrom(1024)
+        data_packet = Packet.from_bytes(raw_data)
+        print("Packet: ", data_packet)
+        print("Payload: ", data_packet.payload.decode("utf-8"))
+        ack = make_ack(ACK, data_packet.seq_num, host)
+        client.sendto(ack.to_bytes(), sender)
+        print("Ack: ", ack)
+        if data_packet.packet_type == FIN:
+            print("LastPacket: ", ack)
+            break
+        else:
+            payload.append(data_packet.payload.decode("utf-8"))
+
+
+    raw_response = ''.join(payload)
     response = parse_http_response(raw_response)
 
     if response["status"] == 301:
@@ -69,7 +92,7 @@ def makeRequest(args, counter=0):
         makeRequest(args, counter + 1)
         return
 
-    content = receiveData if args.verbosity else response["body"]
+    content = raw_response if args.verbosity else response["body"]
     if args.o:
         with open(args.o, "w") as output_file:
             output_file.write(content)

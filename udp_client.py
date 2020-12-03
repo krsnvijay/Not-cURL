@@ -3,19 +3,20 @@ import ipaddress
 import socket
 from utils import split_data_into_packets, send
 from packet import Packet
+from packet import Packet, SYN_ACK, SYN, NAK, ACK, FIN
 
 
-def run_client(router_addr, router_port, server_addr, server_port):
+def establish_handshake(server_addr, server_port, router_addr = "127.0.0.1", router_port=3000):
     established = False
     while not established:
         peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
         conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         peer = peer_ip, server_port
         router = router_addr, router_port
-        timeout = 500
+        timeout = 10
         try:
             print("trying handshake. Send SYN")
-            p = Packet(packet_type=0,
+            p = Packet(packet_type=SYN,
                        seq_num=0,
                        peer_ip_addr=peer_ip,
                        peer_port=server_port,
@@ -41,10 +42,10 @@ def run_client(router_addr, router_port, server_addr, server_port):
             print('Waiting for a response')
             response, sender = conn.recvfrom(1024)
             p = Packet.from_bytes(response)
-            if p.packet_type == 1:
+            if p.packet_type == SYN_ACK:
                 print('Received syn ack, sending ack and data received is {}'.format(p.payload.decode("utf-8")))
                 established = True
-                p_ack = Packet(packet_type=2,
+                p_ack = Packet(packet_type=ACK,
                                seq_num=0,
                                peer_ip_addr=peer_ip,
                                peer_port=server_port,
@@ -58,18 +59,21 @@ def run_client(router_addr, router_port, server_addr, server_port):
         except socket.timeout:
             print('No response after {}s'.format(timeout))
         finally:
-            conn.close()
+            return conn, router
 
 
 # Usage:
 # python echoclient.py --routerhost localhost --routerport 3000 --serverhost localhost --serverport 8007
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--routerhost", help="router host", default="localhost")
-parser.add_argument("--routerport", help="router port", type=int, default=3000)
 
-parser.add_argument("--serverhost", help="server host", default="localhost")
-parser.add_argument("--serverport", help="server port", type=int, default=8008)
-args = parser.parse_args()
 
-run_client(args.routerhost, args.routerport, args.serverhost, args.serverport)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--routerhost", help="router host", default="localhost")
+    parser.add_argument("--routerport", help="router port", type=int, default=3000)
+
+    parser.add_argument("--serverhost", help="server host", default="localhost")
+    parser.add_argument("--serverport", help="server port", type=int, default=8008)
+    args = parser.parse_args()
+    establish_handshake(args.routerhost, args.routerport, args.serverhost, args.serverport)

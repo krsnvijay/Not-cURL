@@ -4,10 +4,11 @@ import pathlib
 import os
 import mimetypes
 from readerswriterlock import ReadersWriterLock
-from httplib import BaseTCPServer, make_http_response, parse_http_request
+from httplib import BaseUDPServer, make_http_response, parse_http_request
 import logging
+# from udp_server import
 
-class SimpleFTPServer(BaseTCPServer):
+class SimpleFTPServer(BaseUDPServer):
 
     def __init__(self, host='127.0.0.1', port=8080, debug=False, directory=None):
         if directory is None:
@@ -133,7 +134,8 @@ if __name__ == "__main__":
 # python httpc.py -get "http://localhost"
 
 # read file
-# python httpc.py -get "https://localhost/out.txt"
+# python httpc.py -get "https://localhost:9000/out.txt"
+# python httpc.py -get "https://127.0.0.1:8080/out.txt"
 
 # write file
 # python httpc.py -post "https://localhost/nice.txt" -f "datafile.json"
@@ -142,7 +144,7 @@ if __name__ == "__main__":
 # python httpc.py -get "http://localhost/randomfile.json"
 
 # Test path permission - security
-# python httpfs.py -v -d "C:\Users\Not A Hero\OneDrive\Desktop\6461-1\fs"
+# python httpfs.py -v -d "C:\Users\Siddharth\Desktop\Study\University\Fall\Networks\Lab1\Not-cURL\fs"
 # python httpc.py -v -get "http://localhost/../fs/nice.txt"
 # python httpc.py -v -get "http://localhost/nice.json"
 
