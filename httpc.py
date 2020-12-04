@@ -52,11 +52,15 @@ def makeRequest(args, counter=0):
         header.append(f"Content-Length: {len(data)}")
     header.insert(0, f'Host: {host}')
     request = make_http_request(request_type, endpoint, header, data)
-    client.send_request(request)
+    while True:
+        status = client.send_request(request)
+        if status:
+            break
     # send http request over TCP
 
     # receive http response
     raw_response = client.receive_response()
+    client.close()
     response = parse_http_response(raw_response)
 
     if response["status"] == 301:

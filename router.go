@@ -60,7 +60,7 @@ func (p Packet) Raw() []byte {
 }
 
 func (p Packet) String() string {
-	return fmt.Sprintf("#%d, %s -> %s, sz=%d", p.SeqNum, p.FromAddr, p.ToAddr, len(p.Payload))
+	return fmt.Sprintf("#%d, %s -> %s, type=%d, sz=%d", p.SeqNum, p.FromAddr, p.ToAddr,p.Type, len(p.Payload))
 }
 
 // parsePacket extracts, validates and creates a packet from a slice of bytes.

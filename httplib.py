@@ -8,6 +8,8 @@ from packet import Packet, ACK, FIN, SYN, SYN_ACK, DATA
 from udp_server import establish_handshake_server
 from utils import make_ack, split_data_into_packets
 
+TIMEOUT = 2
+
 
 def recvall(sock):
     fragments = []
@@ -87,9 +89,12 @@ class BaseUDPServer:
     def run_server(self):
         self.conn.bind((self.host, self.port))
         server = (self.host, self.port)
-        try:
-            logging.info(f"Server Listening for connections at {self.conn.getsockname()}")
-            while True:
+
+        logging.info(f"Server Listening for connections at {self.conn.getsockname()}")
+        client = None
+        router = None
+        while True:
+            try:
                 data, router = self.conn.recvfrom(1024)
                 packet = Packet.from_bytes(data)
                 client = str(packet.peer_ip_addr), packet.peer_port
@@ -99,15 +104,22 @@ class BaseUDPServer:
                 else:
                     # Create a thread everytime there's a new request
                     threading.Thread(target=self.handle_request, args=(packet, client, router)).start()
-        finally:
-            self.conn.close()
+            except socket.timeout:
+                for p in self.clients[client]["response"].keys():
+                    logging.debug(f'({server}->{client}):{p}:Timeout,resending response packet')
+                    self.conn.sendto(self.clients[client]["response"][p].to_bytes(), router)
 
     def handshake_server(self, client, packet, router, server):
         if packet.packet_type == SYN:
-            logging.debug(f'({client}->{server}):{packet}:Reveived SYN')
+            logging.debug(f'({client}->{server}):{packet}:Received SYN')
             # send syn-ack
             syn_ack_pkt = make_ack(SYN_ACK, packet.seq_num, client)
             logging.debug(f'({server}->{client}):{syn_ack_pkt}:Sending SYN-ACK')
+            self.conn.sendto(syn_ack_pkt.to_bytes(), router)
+        if packet.packet_type == DATA:
+            logging.debug(
+                f'({client}->{server}):{packet}:Received data, without handshake -> client"s ACK lost, send SYN-ACK')
+            syn_ack_pkt = make_ack(SYN_ACK, packet.seq_num - 1, client)
             self.conn.sendto(syn_ack_pkt.to_bytes(), router)
         if packet.packet_type == ACK:
             # add sender to connections
@@ -186,10 +198,12 @@ class BaseUDPServer:
                 logging.debug(f'({server}->{client}):{p}:Sending response packet')
                 self.conn.sendto(p.to_bytes(), router)
                 # store packets in dict, later use that dict for checking acks
-
                 self.clients[client]["response"][p.seq_num] = p
+            self.conn.settimeout(2)
 
     def validate_ack(self, client, packet, server):
+        # TODO do timeout and then retransmit unacked response packets
+
         if packet.seq_num in self.clients[client]["response"]:
             logging.debug(f'({client}->{server}):{packet}:ACK received for response packet')
             # remove a response packet from dict if ack is received
@@ -201,6 +215,8 @@ class BaseUDPServer:
                 logging.debug(f'({server}->{client}):Response Finished')
                 # close connection
                 del self.clients[client]
+                self.conn.settimeout(None)
+                return True
         else:
             logging.debug(f'({client}->{server}):{packet}: Duplicate ACK received, ignoring it')
 
@@ -237,14 +253,18 @@ class BaseUDPClient:
             logging.debug(f'(client->{server}):{syn_pkt}:Sending SYN')
             self.conn.sendto(syn_pkt.to_bytes(), self.router)
             # TODO timeout
-
-            raw_packet, router = self.conn.recvfrom(1024)
+            self.conn.settimeout(2)
+            try:
+                raw_packet, router = self.conn.recvfrom(1024)
+            except socket.timeout:
+                logging.debug(f'(client->{server}):Timeout, either SYN dropped or SYN-ACK dropped')
+                continue
             p = Packet.from_bytes(raw_packet)
             if p.packet_type == SYN_ACK:
                 logging.debug(f'({server}->client):{p}:Received SYN_ACK')
                 established = True
                 ack_pkt = make_ack(ACK, 0, server)
-                logging.debug(f'(client->{server}):{p}:Send ACK')
+                logging.debug(f'(client->{server}):{ack_pkt}:Send ACK')
                 self.conn.sendto(ack_pkt.to_bytes(), router)
                 logging.debug("(Handshake Finished)")
                 return established
@@ -264,8 +284,23 @@ class BaseUDPClient:
 
         # validate acks for request packets
         while True:
-            raw_packet, router = self.conn.recvfrom(1024)
+            try:
+                raw_packet, router = self.conn.recvfrom(1024)
+            except socket.timeout:
+                for key in self.communication["request"].keys():
+                    logging.debug(
+                        f'(client->{server}):{self.communication["request"][key]}:Timeout, resending Request Packet')
+                    self.conn.sendto(self.communication["request"][key].to_bytes(), self.router)
+                continue
             packet = Packet.from_bytes(raw_packet)
+            if packet.packet_type == SYN_ACK:
+                logging.debug(
+                    f'({server}->client):{packet}:Received SYN_ACK (Server didn"t receive ACK from handshake)')
+                ack_pkt = make_ack(ACK, 0, server)
+                logging.debug(f'(client->{server}):{ack_pkt}:Send ACK')
+                self.conn.sendto(ack_pkt.to_bytes(), router)
+                logging.debug("(Handshake Finished)")
+                return False
             if packet.seq_num in self.communication["request"]:
                 logging.debug(f'({server}->client):{packet}:ACK received')
                 # remove a request packet from dict if ack is received
@@ -276,13 +311,13 @@ class BaseUDPClient:
                 if is_response_complete:
                     logging.debug(f'(client->{server}):Request Finished')
                     # close connection
-                    break
+                    return True
             else:
                 logging.debug(f'({server}->client):{packet}: Duplicate ACK received, ignoring it')
 
     def receive_response(self):
         server = self.host, self.port
-
+        self.conn.settimeout(None)
         # receive packets
         while True:
             is_receive_complete = "response_length" in self.communication and self.communication[
@@ -316,3 +351,13 @@ class BaseUDPClient:
         raw_response = b''.join(payload)
         logging.debug(f'(response) {raw_response}')
         return raw_response
+
+    def close(self):
+        #todo stop client from bailing after immediately getting a full response as the last ack could have been dropped
+
+        #send fin
+
+        #wait for ack
+        #wait for fin
+        #send ack
+        pass
