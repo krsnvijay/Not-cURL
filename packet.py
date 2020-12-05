@@ -3,7 +3,7 @@ import ipaddress
 MIN_LEN = 11
 MAX_LEN = 1024
 
-TIMEOUT = 5
+TIMEOUT = 2
 SYN = 0
 SYN_ACK = 1
 ACK = 2

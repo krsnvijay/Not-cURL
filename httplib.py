@@ -3,13 +3,13 @@ import socket
 import sys
 import threading
 import logging
+import math
 
-from packet import Packet, ACK, FIN, SYN, SYN_ACK, DATA
+from packet import Packet, ACK, FIN, SYN, SYN_ACK, DATA, TIMEOUT
 from udp_server import establish_handshake_server
 from utils import make_ack, split_data_into_packets
 
-TIMEOUT = 2
-
+WINDOW = 3
 
 def recvall(sock):
     fragments = []
@@ -200,12 +200,13 @@ class BaseUDPServer:
             packets = split_data_into_packets(response, client)
             fin_pkt = make_ack(FIN, len(packets) + 1, client)
             packets.append(fin_pkt)
-            for p in packets:
-                logging.debug(f'({server}->{client}):{p}:Sending response packet')
-                self.conn.sendto(p.to_bytes(), router)
-                # store packets in dict, later use that dict for checking acks
-                self.clients[client]["response"][p.seq_num] = p
-            self.conn.settimeout(2)
+            for j in range(math.ceil(len(packets)/WINDOW)):
+                for p in packets[WINDOW*j:WINDOW*(j+1)]: #packets
+                    logging.debug(f'({server}->{client}):{p}:Sending response packet')
+                    self.conn.sendto(p.to_bytes(), router)
+                    # store packets in dict, later use that dict for checking acks
+                    self.clients[client]["response"][p.seq_num] = p
+            self.conn.settimeout(TIMEOUT)
 
     def validate_ack(self, client, packet, server):
         # TODO do timeout and then retransmit unacked response packets
@@ -259,7 +260,7 @@ class BaseUDPClient:
             logging.debug(f'(client->{server}):{syn_pkt}:Sending SYN')
             self.conn.sendto(syn_pkt.to_bytes(), self.router)
             # TODO timeout
-            self.conn.settimeout(2)
+            self.conn.settimeout(TIMEOUT)
             try:
                 raw_packet, router = self.conn.recvfrom(1024)
             except socket.timeout:
@@ -282,11 +283,12 @@ class BaseUDPClient:
         packets = split_data_into_packets(request, server)
         fin_pkt = make_ack(FIN, len(packets) + 1, server)
         packets.append(fin_pkt)
-        for p in packets:
-            logging.debug(f'(client->{server}):{p}:Send Request Packet')
-            self.conn.sendto(p.to_bytes(), self.router)
-            # store packets in dict, later use that dict for checking acks
-            self.communication["request"][p.seq_num] = p
+        for j in range(math.ceil(len(packets) / WINDOW)):
+            for p in packets[WINDOW * j:WINDOW * (j + 1)]:  # packets
+                logging.debug(f'(client->{server}):{p}:Send Request Packet')
+                self.conn.sendto(p.to_bytes(), self.router)
+                # store packets in dict, later use that dict for checking acks
+                self.communication["request"][p.seq_num] = p
 
         # validate acks for request packets
         while True:
@@ -331,7 +333,7 @@ class BaseUDPClient:
                 self.communication["response"])
 
             if is_receive_complete:
-                self.conn.settimeout(8)
+                self.conn.settimeout(4*TIMEOUT)
 
             try:
                 raw_packet, sender = self.conn.recvfrom(1024)
