@@ -100,14 +100,20 @@ class BaseUDPServer:
                 client = str(packet.peer_ip_addr), packet.peer_port
                 if client not in self.clients:
                     # handshake
-                    self.handshake_server(client, packet, router, server)
+                    # self.handshake_server(client, packet, router, server)
+                    threading.Thread(target=self.handshake_server, args=(client, packet, router, server)).start()
                 else:
                     # Create a thread everytime there's a new request
                     threading.Thread(target=self.handle_request, args=(packet, client, router)).start()
             except socket.timeout:
-                for p in self.clients[client]["response"].keys():
-                    logging.debug(f'({server}->{client}):{p}:Timeout,resending response packet')
-                    self.conn.sendto(self.clients[client]["response"][p].to_bytes(), router)
+                self.resend_lost_packets(client, router, server)
+                threading.Thread(target=self.resend_lost_packets, args=(client, router, server)).start()
+
+    def resend_lost_packets(self, client, router, server):
+        if client in self.clients:
+            for p in self.clients[client]["response"].keys():
+                logging.debug(f'({server}->{client}):{p}:Timeout,resending response packet')
+                self.conn.sendto(self.clients[client]["response"][p].to_bytes(), router)
 
     def handshake_server(self, client, packet, router, server):
         if packet.packet_type == SYN:
@@ -325,9 +331,14 @@ class BaseUDPClient:
                 self.communication["response"])
 
             if is_receive_complete:
+                self.conn.settimeout(8)
+
+            try:
+                raw_packet, sender = self.conn.recvfrom(1024)
+            except socket.timeout:
                 logging.debug(f'(Received Response)')
+                self.conn.settimeout(None)
                 break
-            raw_packet, sender = self.conn.recvfrom(1024)
             packet = Packet.from_bytes(raw_packet)
             ack_pkt = make_ack(ACK, packet.seq_num, server)
             if packet.packet_type == DATA:

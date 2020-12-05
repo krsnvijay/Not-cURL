@@ -132,27 +132,27 @@ if __name__ == "__main__":
 # python httpfs.py
 # Client
 # list files
-# python httpc.py -get "http://localhost"
+# python httpc.py -get "http://127.0.0.1:8080/"
 
 # read file
-# python httpc.py -get "https://localhost:9000/out.txt"
+# python httpc.py -get "https://127.0.0.1:8080//out.txt"
 # python httpc.py -get "https://127.0.0.1:8080/out.txt"
 
 # write file
-# python httpc.py -post "https://localhost/nice.txt" -f "datafile.json"
+# python httpc.py -post "https://127.0.0.1:8080/nice.txt" -f "datafile.json"
 
 # File not found
-# python httpc.py -get "http://localhost/randomfile.json"
+# python httpc.py -get "http://127.0.0.1:8080/randomfile.json"
 
 # Test path permission - security
 # python httpfs.py -v -d "C:\Users\Siddharth\Desktop\Study\University\Fall\Networks\Lab1\Not-cURL\fs"
-# python httpc.py -v -get "http://localhost/../fs/nice.txt"
-# python httpc.py -v -get "http://localhost/nice.json"
+# python httpc.py -v -get "http://127.0.0.1:8080/../fs/nice.txt"
+# python httpc.py -v -get "http://127.0.0.1:8080/nice.json"
 
 # ContentType and Disposition
-# python httpc.py -get "http://localhost/another.json"
-# python httpc.py -get "http://localhost/nice.txt"
-# python httpc.py -get "http://localhost/food.xml"
+# python httpc.py -get "http://127.0.0.1:8080/another.json"
+# python httpc.py -get "http://127.0.0.1:8080/nice.txt"
+# python httpc.py -get "http://127.0.0.1:8080/food.xml"
 
 # concurrency check
 # python concurrency_check.py

@@ -8,8 +8,8 @@ def reset_test_file():
 
 
 parser = get_parser()
-read_args = parser.parse_args(["-get", "http://localhost:9000/test.txt"])
-write_args = parser.parse_args(["-post", "http://localhost:9000/test.txt", "-f", "datafile.json"])
+read_args = parser.parse_args(["-get", "http://127.0.0.1:8080/test.txt"])
+write_args = parser.parse_args(["-post", "http://127.0.0.1:8080/test.txt", "-f", "datafile.json"])
 print(read_args)
 print(write_args)
 
